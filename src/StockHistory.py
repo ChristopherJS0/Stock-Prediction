@@ -1,17 +1,10 @@
-import os
 import pandas as pd
-from datetime import datetime as dt
-import matplotlib.pyplot as plt
 import numpy as np
-from copy import deepcopy
-
 import tensorflow as tf
-from tensorflow.python.keras.models import Sequential
-from tensorflow.python.keras.optimizers import adam_v2
-from tensorflow.python.keras import layers
-TF_ENABLE_ONEDNN_OPTS = 0
+import matplotlib.pyplot as plt
+from datetime import datetime as dt
 
-def createAiModel(xSet, ySet, xVals, yVals, epochs):
+def createAiModel(xSet, ySet, xVal, yVal, epochs):
     '''
     param: set of X values to train on.
     param: set of Y values to train on.
@@ -21,93 +14,83 @@ def createAiModel(xSet, ySet, xVals, yVals, epochs):
 
     rtype: Model created by tensorflow using the LSTM learning technique.
     '''
-    
-    model = tf.keras.models.Sequential([tf.keras.layers.Input((xSet.shape,ySet.shape)),
-                        tf.keras.layers.LSTM(64),
-                        tf.keras.layers.Dense(32, activation='relu'),
-                        tf.keras.layers.Dense(32, activation='relu'),
+    model = tf.keras.models.Sequential([tf.keras.layers.Input(shape=(2,1)),
+                        tf.keras.layers.LSTM(128),
+                        tf.keras.layers.Dense(64, activation='relu'),
+                        tf.keras.layers.Dense(64, activation='relu'),
+                        tf.keras.layers.Dense(64, activation='relu'),
                         tf.keras.layers.Dense(1)])
-    
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
     model.compile(loss='mse',
-              optimizer='Adam',
+              optimizer=optimizer,
               metrics=['mean_absolute_error'])
  
-    model.fit(x=xSet, y=ySet, validation_data=(xVals, yVals), epochs=epochs) 
+    model.fit(x=xSet, y=ySet, validation_data=(xVal, yVal), epochs=epochs) 
 
     return model
 
-def predictFutureVals(dateVals, dateTests, xSet):
-    recursivePredictions = []
-    recursiveDates = np.concatenate([dateVals, dates_test])
+def createFuturePreds(model, lastY, futureDays):
+    fullPreds = []
 
-    for targetDate in recursiveDates:
-        lastWindow = deepcopy(X_train[-1])
-        next_pred = model.predict(np.array([lastWindow])).flatten()
-        recursivePredictions.append(next_pred)
-        lastWindow[-1] = next_pred
-    
-    return recursiveDates, recursivePredictions
+    for _ in range(futureDays):
+        predY = model.predict(lastY).flatten()
+        lastY = np.vstack((lastY, predY[-1]))
+        fullPreds.append(predY[-1])
+
+    return fullPreds
 
 if __name__ == '__main__':
     # Make sure there's a csv file filled with the company's stock history.
     StockDF = pd.read_csv('AppleStock.csv')
-    
-    '''plt.plot(StockDF['Date'], StockDF['Close'])
-    plt.title('Dates and Close Prices')
-    plt.xlabel('Date')
-    plt.ylabel('Close Value')
-    '''
 
     # Preparing data to use for the training.
-    xVals = StockDF['Date'].to_numpy()
-    yVals = StockDF['Close'].to_numpy()
+    dates = StockDF['Date'].to_numpy()
+    StockDF['Date'] = pd.to_datetime(StockDF['Date'])
+    StockDF.set_index('Date', inplace=True)
 
-    print(xVals.shape)
-    
-    q_80 = int(len(yVals) * .8) # 80% of allDates
-    q_90 = int(len(yVals) * .9) # 90% of allDates
+    xVals = StockDF[['Close']]
+    yVals = StockDF['Close']
+
+    y_scaled = yVals.to_numpy().reshape(-1,1)
+
+    q_80 = int(len(StockDF) * .8) # 80% of allDates
+    q_90 = int(len(StockDF) * .9) # 90% of allDates
 
     # Training sets. First 80% of data used to train.
-    dates_train, X_train, y_train = xVals[:q_80], xVals[:q_80], yVals[:q_80]
+    X_train, y_train = xVals[:q_80], y_scaled[:q_80]
     # Validation data. Next 10% of data used to validate the training.
-    dates_val, X_val, y_val = xVals[q_80:q_90], xVals[q_80:q_90], yVals[q_80:q_90]
+    X_val, y_val = xVals[q_80:q_90], y_scaled[q_80:q_90]
     # Testing data.
-    dates_test, X_test, y_test = xVals[q_90:], xVals[q_90:], yVals[q_90:]
+    X_test, y_test = xVals[q_90:], y_scaled[q_90:]
+
+    datesTrain = dates[:q_80]
+    datesVal = dates[q_80:q_90]
+    datesTest = dates[q_90:]
 
     # Get the AI model to train, val, and test.
     model = createAiModel(X_train, y_train, X_val, y_val, 100)
-    
-    # Plotting the training graph.
-    trainPreds = model.predict(X_train).flatten()
-    plt.plot(dates_train, trainPreds)
-    plt.plot(dates_train, y_train)
-    plt.legend(['Training Predictions', 'Training Observations'])
 
-    # Plotting the validation prediction graph.
-    val_predictions = model.predict(X_val).flatten()
-    plt.plot(dates_val, val_predictions)
-    plt.plot(dates_val, y_val)
-    plt.legend(['Validation Predictions', 'Validation Observations'])
+    # Plotting the training graph.
+    trainPreds = model.predict(y_train).flatten()
+    plt.plot(datesTrain, trainPreds)
+    plt.plot(datesTrain, y_train)
+    plt.legend(['Training Predictions', 'Training Observations'])
+    plt.show()
 
     # Plotting the testing prediction graph.
-    test_predictions = model.predict(X_test).flatten()
-    plt.plot(dates_test, test_predictions)
-    plt.plot(dates_test, y_test)
+    test_predictions = model.predict(y_test).flatten()
+    plt.plot(datesTest, test_predictions)
+    plt.plot(datesTest, y_test)
     plt.legend(['Testing Predictions', 'Testing Observations'])
+    plt.show()
 
-    #rDates, rPreds = predictFutureVals(dates_val, dates_test, X_train)
-
-    plt.plot(dates_train, trainPreds)
-    plt.plot(dates_train, y_train)
-    plt.plot(dates_val, val_predictions)
-    plt.plot(dates_val, y_val)
-    plt.plot(dates_test, test_predictions)
-    plt.plot(dates_test, y_test)
-    #plt.plot(rDates, rPreds)
-    plt.legend(['Training Predictions', 
-                'Training Observations',
-                'Validation Predictions', 
-                'Validation Observations',
-                'Testing Predictions', 
-                'Testing Observations'])
-
+    # Predicting future values based off training from final value.
+    numOfNextDays = 50 # Generate dates from today until 30 days from now
+    futurePreds = createFuturePreds(model, y_test, numOfNextDays)
+    nextDays = np.concatenate((test_predictions, futurePreds))
+    days = list(range(1,len(nextDays)+1))
+    plt.plot(days, nextDays)
+    plt.legend(['Future Predictions for stock Values.'])
+    plt.show()
+    
+    model.summary()
