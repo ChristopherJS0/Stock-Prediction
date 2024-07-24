@@ -8,7 +8,9 @@ from datetime import datetime, timedelta
 
 def prepareData(StockDF):
     '''
-    stockDF : Datatframe that will be prepared for analyzing
+    @stockDF : Datatframe that will be prepared for analyzing
+
+    rtype : A list of all data lists needed to train the model.
     '''
 
     # Preparing data to use for the training.
@@ -36,11 +38,11 @@ def prepareData(StockDF):
 
 def createAiModel(xSet, ySet, xVal, yVal, epochs):
     '''
-    xSet: set of X values to train on.
-    ySet: set of Y values to train on.
-    xVal: set of x validation values.
-    yVal: set of y validation values.
-    epochs: Number of times to train the model
+    @xSet: set of X values to train on.
+    @ySet: set of Y values to train on.
+    @xVal: set of x validation values.
+    @yVal: set of y validation values.
+    @epochs: Number of times to train the model
 
     rtype: Model created by tensorflow using the LSTM learning technique.
     '''
@@ -59,12 +61,18 @@ def createAiModel(xSet, ySet, xVal, yVal, epochs):
 
     return model
 
-def createFuturePreds(model, lastY, futureDays):
+def createFuturePreds(model, lastYs, futureDays):
+    '''
+    @model: Tensorflow sequential model that will predict the next values.
+    @lastYs: List of close to last values in the stock history.
+    @futureDays: Amount of days in the future to predict stock values.
+    '''
+    
     fullPreds = []
 
     for _ in range(futureDays):
-        predY = model.predict(lastY).flatten()
-        lastY = np.vstack((lastY, predY[-1]))
+        predY = model.predict(lastYs).flatten()
+        lastYs = np.vstack((lastYs, predY[-1]))
         fullPreds.append(predY[-1])
 
     return fullPreds
