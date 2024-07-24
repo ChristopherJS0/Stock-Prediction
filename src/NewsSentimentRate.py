@@ -32,36 +32,26 @@ def analyze_sentiment(text):
     print(sentiment_scores['compound'])
 
     # Determine if the sentiment is positive, negative, or neutral
-    if sentiment_scores['compound'] >= 0.3:
-        return 'Positive'
-    elif sentiment_scores['compound'] == 0:
-        return 'Neutral'
-    elif sentiment_scores['compound'] < 0.3:
-        return 'Negative'
+    return sentiment_scores['compound']
 
 def rate_all_news(company):
     AllNews = GettingCompanyNews.getCompanyNews(company)    
-    goodNews = 0
-    badNews = 0
+    newsRatePercent = 0
+
     for rawArticle in AllNews:
         article = preprocess_text(rawArticle)
-        newsRate = analyze_sentiment(article)
+        score = analyze_sentiment(article)
 
-        if newsRate == 'Positive':
-            goodNews = goodNews + 1
-        elif newsRate == 'Negative':
-            badNews = badNews + 1
+        newsRatePercent = newsRatePercent + score
 
-    print(goodNews)
-    print(badNews)
+    print(newsRatePercent)
 
-    if goodNews > badNews:
+    if newsRatePercent > 2.5:
         print('Promising news about ' + company + '!')
-    elif badNews > goodNews:
+        print('Stock values should be rising or already high, consider purchasing.')
+    elif newsRatePercent < .7:
         print('Not the best news about ' + company + '...')
+        print('Consider where the low point of the stock will rest and consider purchasing there.')
     else:
-        print('Results inconclusive... unchanged prediction from stock history')
-    
-if __name__ == '__main__':
-    Company = input('Enter the company you would like to research: ')
-    rate_all_news(Company)
+        print('Results from ' + company +' news are ordinary.')
+        print('Unsure if purchasing stock is the best choice or not with news.')
